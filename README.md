@@ -1,29 +1,46 @@
 # Eva AI Assistant
 
-A clean web-first foundation for Eva, a personal AI assistant.
+Eva is a web-first personal AI assistant for Alam, with separate authenticated owner and guest modes.
 
-## Included now
-- Responsive Eva chat UI
-- Hindi / Hinglish / English conversation support
-- Server-side AI endpoint at `/api/chat`
-- Browser voice input where supported
-- API key kept server-side, never in frontend code
-- Vercel-ready, no build step required
+## Current build
 
-## Connect the real AI brain
-Add these environment variables in your deployment:
+- Real AI chat through the OpenAI Responses API.
+- Hindi / Hinglish / English conversation.
+- Secure server-side owner session using HMAC.
+- Owner and guest roles are decided on the server, not by a frontend flag.
+- Guest users cannot be treated as the owner.
+- Local conversation persistence per role in the browser.
+- Browser speech-to-text and optional text-to-speech.
+- PWA manifest + offline shell.
+- Android WebView app project.
+- GitHub Actions workflow for a debug APK artifact.
 
-- `OPENAI_API_KEY` — your API key
-- `OPENAI_MODEL` — optional model override; default is `gpt-5-mini`
+OpenAI's Responses API is used for the AI backend.
 
-Do **not** put the API key in `index.html` or `app.js`.
+## Required deployment environment variables
 
-## Next Eva stages
-1. Persistent memory and user preferences
-2. Natural voice conversation
-3. Safe agent/tool actions
-4. Owner mode and permissions
-5. Android integration
-6. Reminders and automation
+Set these in Vercel or the server hosting the API:
 
-Eva should never claim an external action happened unless a connected tool actually performed it.
+- `OPENAI_API_KEY` — required for real AI replies.
+- `OPENAI_MODEL` — optional; defaults to `gpt-5-mini`.
+- `EVA_OWNER_SECRET` — private owner login secret.
+- `EVA_SESSION_SECRET` — strong random secret, at least 32 characters.
+
+Never put `OPENAI_API_KEY`, `EVA_OWNER_SECRET`, or `EVA_SESSION_SECRET` in frontend files.
+
+## Android APK
+
+The Android project is under `android/`.
+
+GitHub Actions workflow:
+`.github/workflows/android-apk.yml`
+
+It creates a debug APK artifact named `Eva-AI-debug-apk`. The workflow accepts the deployed Eva web URL as `eva_url`.
+
+The default URL is a placeholder. Before distributing the APK, replace it with the actual deployed Eva URL.
+
+## Important
+
+This build does not yet perform real device-control actions. Eva must never claim that it opened an app, sent a message, changed a setting, or performed another external action unless a connected tool actually did it.
+
+Persistent server-side long-term memory, reminders, and controlled agent tools should be added only with an actual database/tool integration; browser localStorage is used for the current chat history.
