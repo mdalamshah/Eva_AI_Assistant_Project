@@ -1,0 +1,14 @@
+plugins { id 'com.android.application' }
+def evaUrl = project.findProperty("evaUrl") ?: "https://eva-ai-assistant-project.vercel.app/"
+android {
+  namespace "com.mdalamshah.eva"
+  compileSdk 35
+  defaultConfig {
+    applicationId "com.mdalamshah.eva"
+    minSdk 23
+    targetSdk 35
+    versionCode 1
+    versionName "1.0"
+    buildConfigField "String", "EVA_URL", "\"${evaUrl}\""
+  }
+}
