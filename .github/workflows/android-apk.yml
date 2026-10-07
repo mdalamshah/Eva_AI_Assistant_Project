@@ -1,5 +1,9 @@
 name: Build Eva Android APK
 on:
+  push:
+    paths:
+      - "android/**"
+      - ".github/workflows/android-apk.yml"
   workflow_dispatch:
     inputs:
       eva_url:
