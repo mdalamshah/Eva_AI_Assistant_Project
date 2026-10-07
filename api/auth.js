@@ -27,7 +27,10 @@ export default async function handler(req,res){
   if(!session||session.length<32)return res.status(503).json({error:"Authentication is not configured securely."});
   const mode=String(req.body?.mode||"user");
   if(mode==="owner"){
+    const ownerEmail=String(process.env.EVA_OWNER_EMAIL||"mdalam67860@gmail.com").trim().toLowerCase();
+    const providedEmail=String(req.body?.email||"").trim().toLowerCase();
     const expected=process.env.EVA_OWNER_SECRET,provided=String(req.body?.secret||"");
+    if(providedEmail!==ownerEmail)return res.status(401).json({error:"Owner email does not match."});
     if(!expected)return res.status(503).json({error:"Owner authentication is not configured."});
     const a=Buffer.from(expected),b=Buffer.from(provided);
     if(a.length!==b.length||!crypto.timingSafeEqual(a,b))return res.status(401).json({error:"Invalid owner secret"});
