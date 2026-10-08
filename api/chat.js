@@ -1,12 +1,26 @@
 import {isOwner} from "./_auth.js";
-function userLoggedIn(req){return /(?:^|;\s*)eva_user=([^;]+)/.test(req.headers.cookie||"");}
+
+function userLoggedIn(req){
+  return /(?:^|;\s*)eva_user=([^;]+)/.test(req.headers.cookie||"");
+}
+
 export default async function handler(req,res){
   if(req.method!=="POST")return res.status(405).json({error:"Method not allowed"});
   try{
-    const {messages=[]}=req.body||{},owner=isOwner(req),loggedIn=owner||userLoggedIn(req),key=process.env.OPENAI_API_KEY;
+    const {messages=[]}=req.body||{};
+    const owner=isOwner(req);
+    const loggedIn=owner||userLoggedIn(req);
+    const key=process.env.GEMINI_API_KEY;
+
     if(!loggedIn)return res.status(401).json({error:"Login required"});
-    if(!key)return res.status(503).json({error:"OPENAI_API_KEY is not configured"});
-    const input=messages.slice(-24).filter(m=>["user","assistant"].includes(m?.role)&&typeof m.content==="string").map(m=>({role:m.role,content:m.content.slice(0,12000)}));
+    if(!key)return res.status(503).json({error:"GEMINI_API_KEY is not configured"});
+
+    const input=messages.slice(-24)
+      .filter(m=>["user","assistant"].includes(m?.role)&&typeof m.content==="string")
+      .map(m=>({role:m.role==="assistant"?"model":"user",parts:[{text:m.content.slice(0,12000)}]}));
+
+    if(!input.length)return res.status(400).json({error:"Message is required"});
+
     const instructions=[
       "You are Eva, a warm, intelligent personal AI assistant created by Alam.",
       "Speak naturally in Hindi, Hinglish, or English according to the user.",
@@ -27,9 +41,23 @@ export default async function handler(req,res){
       "Never claim an external action happened unless a connected tool actually performed it.",
       "Be helpful, concise, and honest about limitations."
     ].join(" ");
-    const response=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+key},body:JSON.stringify({model:process.env.OPENAI_MODEL||"gpt-5-mini",instructions,input,max_output_tokens:1200})});
+
+    const model=process.env.GEMINI_CHAT_MODEL||"gemini-2.5-flash";
+    const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-goog-api-key":key},
+      body:JSON.stringify({
+        systemInstruction:{parts:[{text:instructions}]},
+        contents:input,
+        generationConfig:{maxOutputTokens:1200,temperature:0.8}
+      })
+    });
+
     const data=await response.json();
-    if(!response.ok)return res.status(response.status).json({error:data.error?.message||"AI request failed"});
-    return res.status(200).json({reply:data.output_text||"I couldn't generate a response."});
+    if(!response.ok)return res.status(response.status).json({error:data?.error?.message||"Gemini request failed"});
+
+    const reply=data?.candidates?.[0]?.content?.parts?.map(p=>p?.text||"").join("").trim();
+    if(!reply)return res.status(502).json({error:"Gemini returned no text response"});
+    return res.status(200).json({reply});
   }catch(e){return res.status(500).json({error:e.message||"Server error"});}
 }
