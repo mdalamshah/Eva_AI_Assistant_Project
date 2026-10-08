@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import {isOwner,isUser} from "./_auth.js";
 
 const LIMIT=10;
 const DAY=24*60*60*1000;
@@ -29,12 +30,9 @@ function setCount(res,start,count){
   const value=Buffer.from(payload+"|"+sign(payload)).toString("base64url");
   res.setHeader("Set-Cookie",`eva_img=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`);
 }
-function loggedIn(req){
-  return /(?:^|;\s*)eva_owner=/.test(req.headers.cookie||"")||/(?:^|;\s*)eva_user=/.test(req.headers.cookie||"");
-}
 export default async function handler(req,res){
   if(req.method!=="POST"&&req.method!=="GET")return res.status(405).json({error:"Method not allowed"});
-  if(!loggedIn(req))return res.status(401).json({error:"Login required"});
+  if(!isOwner(req)&&!isUser(req))return res.status(401).json({error:"Login required"});
   const usage=countFor(req);
   if(req.method==="GET")return res.status(200).json({used:usage.count,limit:LIMIT,remaining:Math.max(0,LIMIT-usage.count)});
   if(usage.count>=LIMIT)return res.status(429).json({error:"Aaj ki image limit (10) poori ho gayi hai. 24 ghante baad phir try karein.",used:usage.count,limit:LIMIT,remaining:0});
