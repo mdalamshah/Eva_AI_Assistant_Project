@@ -7,10 +7,9 @@ export default async function handler(req,res){
     const owner=isOwner(req);
     const loggedIn=owner||isUser(req);
     const key=process.env.GEMINI_API_KEY;
-    const openaiKey=process.env.OPENAI_API_KEY;
 
     if(!loggedIn)return res.status(401).json({error:"Login required"});
-    if(!key&&!openaiKey)return res.status(503).json({error:"AI API is not configured. Add GEMINI_API_KEY or OPENAI_API_KEY in Vercel Environment Variables."});
+    if(!key)return res.status(503).json({error:"Eva AI is not configured. Add GEMINI_API_KEY in Vercel Environment Variables."});
 
     const cleanMessages=messages.slice(-24)
       .filter(m=>["user","assistant"].includes(m?.role)&&typeof m.content==="string")
@@ -48,7 +47,7 @@ export default async function handler(req,res){
 
     if(key){
       const requestedModel=String(process.env.GEMINI_CHAT_MODEL||"").trim();
-      const models=["gemini-3.5-flash-lite","gemini-3.1-flash-lite","gemini-2.5-flash-lite","gemini-3.8-flash",requestedModel].filter(Boolean)
+      const models=["gemini-3.5-flash-lite","gemini-3.1-flash-lite","gemini-2.5-flash-lite",requestedModel].filter(Boolean)
         .filter((m,i,a)=>a.indexOf(m)===i);
 
       for(const model of models){
@@ -77,38 +76,7 @@ export default async function handler(req,res){
       }
     }
 
-    const allowOpenAIFallback=String(process.env.OPENAI_CHAT_FALLBACK||"false").toLowerCase()==="true";
-    if(openaiKey&&allowOpenAIFallback){
-      const inputForOpenAI=cleanMessages.map(m=>({
-        role:m.role,
-        content:m.content
-      }));
-
-      try{
-        const openaiResponse=await fetch("https://api.openai.com/v1/responses",{
-          method:"POST",
-          headers:{"Content-Type":"application/json","Authorization":"Bearer "+openaiKey},
-          body:JSON.stringify({
-            model:String(process.env.OPENAI_CHAT_MODEL||"gpt-5").trim(),
-            instructions,
-            input:inputForOpenAI,
-            max_output_tokens:1200
-          })
-        });
-        const openaiData=await openaiResponse.json().catch(()=>({}));
-        if(openaiResponse.ok){
-          const reply=String(openaiData?.output_text||"").trim();
-          if(reply)return res.status(200).json({reply});
-          lastError="OpenAI returned no text response";
-        }else{
-          lastError=openaiData?.error?.message||("OpenAI request failed ("+openaiResponse.status+")");
-        }
-      }catch(e){
-        lastError=e?.message||"OpenAI request failed";
-      }
-    }
-
-    return res.status(502).json({error:lastError||"Gemini AI is temporarily unavailable. Please check GEMINI_API_KEY and Gemini API quota."});
+    // OpenAI is intentionally not used here. Eva chat must stay on Gemini.\n\n    return res.status(502).json({error:"Eva Gemini AI is unavailable right now. Please check the Gemini API key/quota in Vercel. Details: "+(lastError||"unknown Gemini error")});
   }catch(e){
     return res.status(500).json({error:e.message||"Server error"});
   }
