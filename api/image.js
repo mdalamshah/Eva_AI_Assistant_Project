@@ -30,7 +30,7 @@ function setCount(res,start,count){
   res.setHeader("Set-Cookie",`eva_img=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`);
 }
 function loggedIn(req){
-  return /(?:^|;\\s*)eva_owner=/.test(req.headers.cookie||"")||/(?:^|;\\s*)eva_user=/.test(req.headers.cookie||"");
+  return /(?:^|;\s*)eva_owner=/.test(req.headers.cookie||"")||/(?:^|;\s*)eva_user=/.test(req.headers.cookie||"");
 }
 export default async function handler(req,res){
   if(req.method!=="POST"&&req.method!=="GET")return res.status(405).json({error:"Method not allowed"});
