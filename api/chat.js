@@ -48,7 +48,7 @@ export default async function handler(req,res){
 
     if(key){
       const requestedModel=String(process.env.GEMINI_CHAT_MODEL||"").trim();
-      const models=[requestedModel,"gemini-3.8-flash","gemini-3.5-flash-lite","gemini-3.1-flash-lite","gemini-2.5-flash","gemini-2.5-flash-lite"].filter(Boolean)
+      const models=["gemini-3.5-flash-lite","gemini-3.1-flash-lite","gemini-2.5-flash-lite","gemini-3.8-flash",requestedModel].filter(Boolean)
         .filter((m,i,a)=>a.indexOf(m)===i);
 
       for(const model of models){
@@ -70,14 +70,15 @@ export default async function handler(req,res){
           }else{
             lastError=data?.error?.message||("Gemini request failed ("+response.status+")");
           }
-          if(![400,404].includes(response.status))break;
+          if(response.status===401||response.status===404||response.status===400||response.status===403||response.status===429)continue;
         }catch(e){
           lastError=e?.message||"Gemini request failed";
         }
       }
     }
 
-    if(openaiKey){
+    const allowOpenAIFallback=String(process.env.OPENAI_CHAT_FALLBACK||"false").toLowerCase()==="true";
+    if(openaiKey&&allowOpenAIFallback){
       const inputForOpenAI=cleanMessages.map(m=>({
         role:m.role,
         content:m.content
@@ -107,7 +108,7 @@ export default async function handler(req,res){
       }
     }
 
-    return res.status(502).json({error:lastError||"AI provider request failed"});
+    return res.status(502).json({error:lastError||"Gemini AI is temporarily unavailable. Please check GEMINI_API_KEY and Gemini API quota."});
   }catch(e){
     return res.status(500).json({error:e.message||"Server error"});
   }
