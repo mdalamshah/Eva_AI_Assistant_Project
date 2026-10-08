@@ -76,7 +76,7 @@ export default async function handler(req,res){
         method:"POST",
         headers:{"Content-Type":"application/json","Authorization":"Bearer "+openaiKey},
         body:JSON.stringify({
-          model:String(process.env.OPENAI_CHAT_MODEL||"gpt-6-luna").trim(),
+          model:String(process.env.OPENAI_CHAT_MODEL||"gpt-5").trim(),
           instructions,
           input:inputForOpenAI,
           max_output_tokens:1200
