@@ -32,10 +32,15 @@ export function isOwner(req){
 export function isUser(req){
   const raw=cookie(req,"eva_user");
   if(!raw)return false;
-  const decoded=decodeURIComponent(raw);
-  if(decoded==="null"||decoded.length<2)return false;
-  const expected=userToken(decoded);
-  if(!expected)return false;
-  const a=Buffer.from(raw),b=Buffer.from(expected);
-  return a.length===b.length&&crypto.timingSafeEqual(a,b);
+  try{
+    const dot=raw.lastIndexOf(".");
+    if(dot<1)return false;
+    const encodedName=raw.slice(0,dot),provided=raw.slice(dot+1);
+    const name=decodeURIComponent(encodedName);
+    if(name==="null"||name.length<2)return false;
+    const expected=userToken(name);
+    if(!expected)return false;
+    const a=Buffer.from(provided),b=Buffer.from(expected);
+    return a.length===b.length&&crypto.timingSafeEqual(a,b);
+  }catch{return false}
 }
