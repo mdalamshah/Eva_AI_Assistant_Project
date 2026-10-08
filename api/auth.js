@@ -37,7 +37,7 @@ export default async function handler(req,res){
 
   const mode=String(req.body?.mode||"user");
   if(mode==="owner"){
-    const ownerEmail=String(process.env.EVA_OWNER_EMAIL||"mdalamshah@gmail.com").trim().toLowerCase();
+    const ownerEmail=String(process.env.EVA_OWNER_EMAIL||"mdalam67860@gmail.com").trim().toLowerCase();
     const providedEmail=String(req.body?.email||"").trim().toLowerCase();
     const expected=process.env.EVA_OWNER_SECRET,provided=String(req.body?.secret||"");
     if(providedEmail!==ownerEmail)return res.status(401).json({error:"Owner email does not match."});
