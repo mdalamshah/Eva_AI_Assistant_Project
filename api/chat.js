@@ -43,7 +43,7 @@ export default async function handler(req,res){
     ].join(" ");
 
     const requestedModel=String(process.env.GEMINI_CHAT_MODEL||"").trim();
-    const models=[requestedModel,"gemini-3.5-flash-lite","gemini-3.1-flash-lite","gemini-2.5-flash"].filter(Boolean)
+    const models=[requestedModel,"gemini-3.8-flash","gemini-3.5-flash-lite","gemini-3.1-flash-lite","gemini-2.5-flash","gemini-2.5-flash-lite"].filter(Boolean)
       .filter((m,i,a)=>a.indexOf(m)===i);
     let data=null,response=null,lastError="";
 
