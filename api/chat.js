@@ -1,5 +1,5 @@
 import {isOwner} from "./_auth.js";
-function userLoggedIn(req){return /(?:^|;\\s*)eva_user=([^;]+)/.test(req.headers.cookie||"");}
+function userLoggedIn(req){return /(?:^|;\s*)eva_user=([^;]+)/.test(req.headers.cookie||"");}
 export default async function handler(req,res){
   if(req.method!=="POST")return res.status(405).json({error:"Method not allowed"});
   try{
