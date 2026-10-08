@@ -9,7 +9,7 @@ on:
       eva_url:
         description: Deployed Eva web URL
         required: true
-        default: https://eva-ai-assistant-project.vercel.app/
+        default: https://evaaiassistantproject.vercel.app/
 jobs:
   build:
     runs-on: ubuntu-latest
