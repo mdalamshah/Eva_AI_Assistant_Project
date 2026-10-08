@@ -42,21 +42,31 @@ export default async function handler(req,res){
       "Be helpful, concise, and honest about limitations."
     ].join(" ");
 
-    const model=process.env.GEMINI_CHAT_MODEL||"gemini-3.5-flash-lite";
-    const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
-      method:"POST",
-      headers:{"Content-Type":"application/json","x-goog-api-key":key},
-      body:JSON.stringify({
-        systemInstruction:{parts:[{text:instructions}]},
-        contents:input,
-        generationConfig:{maxOutputTokens:1200,temperature:0.8}
-      })
-    });
+    const requestedModel=String(process.env.GEMINI_CHAT_MODEL||"").trim();
+    const models=[requestedModel,"gemini-3.5-flash-lite","gemini-3.1-flash-lite","gemini-2.5-flash"].filter(Boolean)
+      .filter((m,i,a)=>a.indexOf(m)===i);
+    let data=null,response=null,lastError="";
 
-    const data=await response.json();
-    if(!response.ok)return res.status(response.status).json({error:data?.error?.message||"Gemini request failed"});
+    for(const model of models){
+      response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","x-goog-api-key":key},
+        body:JSON.stringify({
+          systemInstruction:{parts:[{text:instructions}]},
+          contents:input,
+          generationConfig:{maxOutputTokens:1200,temperature:0.8}
+        })
+      });
+      data=await response.json().catch(()=>({}));
+      if(response.ok)break;
+      lastError=data?.error?.message||("Gemini request failed ("+response.status+")");
+      if(![400,404].includes(response.status))break;
+    }
 
-    const reply=data?.candidates?.[0]?.content?.parts?.map(p=>p?.text||"").join("").trim();
+    if(!response?.ok){
+      return res.status(response?.status||502).json({error:lastError||"Gemini request failed"});
+    }
+
     if(!reply)return res.status(502).json({error:"Gemini returned no text response"});
     return res.status(200).json({reply});
   }catch(e){return res.status(500).json({error:e.message||"Server error"});}
