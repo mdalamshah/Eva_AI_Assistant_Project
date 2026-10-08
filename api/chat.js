@@ -11,9 +11,10 @@ export default async function handler(req,res){
     const owner=isOwner(req);
     const loggedIn=owner||userLoggedIn(req);
     const key=process.env.GEMINI_API_KEY;
+    const openaiKey=process.env.OPENAI_API_KEY;
 
     if(!loggedIn)return res.status(401).json({error:"Login required"});
-    if(!key)return res.status(503).json({error:"GEMINI_API_KEY is not configured"});
+    if(!key&&!openaiKey)return res.status(503).json({error:"AI API is not configured. Add GEMINI_API_KEY or OPENAI_API_KEY in Vercel Environment Variables."});
 
     const input=messages.slice(-24)
       .filter(m=>["user","assistant"].includes(m?.role)&&typeof m.content==="string")
@@ -63,12 +64,34 @@ export default async function handler(req,res){
       if(![400,404].includes(response.status))break;
     }
 
-    if(!response?.ok){
-      return res.status(response?.status||502).json({error:lastError||"Gemini request failed"});
+    if(response?.ok){
+      const reply=data?.candidates?.[0]?.content?.parts?.map(p=>p?.text||"").join("").trim();
+      if(reply)return res.status(200).json({reply});
+      lastError="Gemini returned no text response";
     }
 
-    const reply=data?.candidates?.[0]?.content?.parts?.map(p=>p?.text||"").join("").trim();
-    if(!reply)return res.status(502).json({error:"Gemini returned no text response"});
-    return res.status(200).json({reply});
+    if(openaiKey){
+      const inputForOpenAI=input.map(m=>({role:m.role,content:m.parts?.map(p=>p.text||"").join("")||""}));
+      const openaiResponse=await fetch("https://api.openai.com/v1/responses",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","Authorization":"Bearer "+openaiKey},
+        body:JSON.stringify({
+          model:String(process.env.OPENAI_CHAT_MODEL||"gpt-6-luna").trim(),
+          instructions,
+          input:inputForOpenAI,
+          max_output_tokens:1200
+        })
+      });
+      const openaiData=await openaiResponse.json().catch(()=>({}));
+      if(openaiResponse.ok){
+        const reply=String(openaiData?.output_text||"").trim();
+        if(reply)return res.status(200).json({reply});
+        lastError="OpenAI returned no text response";
+      }else{
+        lastError=openaiData?.error?.message||("OpenAI request failed ("+openaiResponse.status+")");
+      }
+    }
+
+    return res.status(502).json({error:lastError||"AI provider request failed"});
   }catch(e){return res.status(500).json({error:e.message||"Server error"});}
 }
