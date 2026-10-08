@@ -1,15 +1,11 @@
-import {isOwner} from "./_auth.js";
-
-function userLoggedIn(req){
-  return /(?:^|;\s*)eva_user=([^;]+)/.test(req.headers.cookie||"");
-}
+import {isOwner,isUser} from "./_auth.js";
 
 export default async function handler(req,res){
   if(req.method!=="POST")return res.status(405).json({error:"Method not allowed"});
   try{
     const {messages=[]}=req.body||{};
     const owner=isOwner(req);
-    const loggedIn=owner||userLoggedIn(req);
+    const loggedIn=owner||isUser(req);
     const key=process.env.GEMINI_API_KEY;
     const openaiKey=process.env.OPENAI_API_KEY;
 
