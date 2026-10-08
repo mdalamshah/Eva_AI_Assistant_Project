@@ -7,11 +7,14 @@ function getUser(req){
   if(!m)return null;
   const raw=m[1];
   try{
-    const name=decodeURIComponent(raw);
+    const dot=raw.lastIndexOf(".");
+    if(dot<1)return null;
+    const encodedName=raw.slice(0,dot),provided=raw.slice(dot+1);
+    const name=decodeURIComponent(encodedName);
     if(name==="null"||name.length<2)return null;
     const expected=userToken(name);
     if(!expected)return null;
-    const a=Buffer.from(raw),b=Buffer.from(expected);
+    const a=Buffer.from(provided),b=Buffer.from(expected);
     if(a.length!==b.length||!crypto.timingSafeEqual(a,b))return null;
     return name;
   }catch{return null}
@@ -52,6 +55,6 @@ export default async function handler(req,res){
   if(name.length<2)return res.status(400).json({error:"Please enter your name."});
   const token=userToken(name);
   if(!token)return res.status(503).json({error:"Authentication is not configured securely."});
-  res.setHeader("Set-Cookie","eva_user="+encodeURIComponent(name)+"; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000");
+  res.setHeader("Set-Cookie","eva_user="+encodeURIComponent(name)+"."+token+"; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000");
   return res.status(200).json({role:"user",name});
 }
