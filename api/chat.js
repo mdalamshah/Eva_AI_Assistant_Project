@@ -67,6 +67,7 @@ export default async function handler(req,res){
       return res.status(response?.status||502).json({error:lastError||"Gemini request failed"});
     }
 
+    const reply=data?.candidates?.[0]?.content?.parts?.map(p=>p?.text||"").join("").trim();
     if(!reply)return res.status(502).json({error:"Gemini returned no text response"});
     return res.status(200).json({reply});
   }catch(e){return res.status(500).json({error:e.message||"Server error"});}
