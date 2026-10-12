@@ -46,43 +46,41 @@ export default async function handler(req,res){
     ].join(" ");
 
     let lastError="";
+    const requestedModel=String(process.env.GEMINI_CHAT_MODEL||"").trim();
+    const models=["gemini-3.8-flash","gemini-3.5-flash-lite",requestedModel]
+      .filter(Boolean).filter((m,i,a)=>a.indexOf(m)===i);
 
-    if(key){
-      const requestedModel=String(process.env.GEMINI_CHAT_MODEL||"").trim();
-      const models=["gemini-3.5-flash-lite","gemini-3.1-flash-lite","gemini-3.5-flash",requestedModel].filter(Boolean)
-        .filter((m,i,a)=>a.indexOf(m)===i);
-
-      for(const model of models){
-        try{
-          const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
-            method:"POST",
-            headers:{"Content-Type":"application/json","x-goog-api-key":key},
-            body:JSON.stringify({
-              systemInstruction:{parts:[{text:instructions}]},
-              contents:input,
-              tools:[{google_search:{}}],
-              generationConfig:{maxOutputTokens:1200,temperature:0.8}
-            })
-          });
-          const data=await response.json().catch(()=>({}));
-          if(response.ok){
-            const reply=data?.candidates?.[0]?.content?.parts?.map(p=>p?.text||"").join("").trim();
-            if(reply)return res.status(200).json({reply});
-            lastError="Gemini returned no text response";
-          }else{
-            lastError=data?.error?.message||("Gemini request failed ("+response.status+")");
-          }
-          if(response.status===401||response.status===404||response.status===400||response.status===403||response.status===429)continue;
-        }catch(e){
-          lastError=e?.message||"Gemini request failed";
+    for(const model of models){
+      try{
+        const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
+          method:"POST",
+          headers:{"Content-Type":"application/json","x-goog-api-key":key},
+          body:JSON.stringify({
+            systemInstruction:{parts:[{text:instructions}]},
+            contents:input,
+            tools:[{google_search:{}}],
+            generationConfig:{maxOutputTokens:1200,temperature:0.8}
+          })
+        });
+        const data=await response.json().catch(()=>({}));
+        if(response.ok){
+          const reply=data?.candidates?.[0]?.content?.parts?.map(p=>p?.text||"").join("").trim();
+          if(reply)return res.status(200).json({reply});
+          lastError="Gemini returned no text response";
+        }else{
+          lastError=data?.error?.message||("Gemini request failed ("+response.status+")");
+          console.error("Eva Gemini request failed",JSON.stringify({model,status:response.status,error:lastError.slice(0,500)}));
         }
+        if(response.status===401||response.status===404||response.status===400||response.status===403||response.status===429)continue;
+      }catch(e){
+        lastError=e?.message||"Gemini request failed";
+        console.error("Eva Gemini network error",JSON.stringify({model,error:lastError.slice(0,500)}));
       }
     }
 
-    // OpenAI is intentionally not used here. Eva chat must stay on Gemini.
-
     return res.status(502).json({error:"Eva Gemini AI is unavailable right now. Please check the Gemini API key/quota in Vercel. Details: "+(lastError||"unknown Gemini error")});
   }catch(e){
-    return res.status(500).json({error:e.message||"Server error"});
+    console.error("Eva chat handler error",e?.message||"Unknown error");
+    return res.status(500).json({error:"Eva chat server error. Please try again."});
   }
 }
