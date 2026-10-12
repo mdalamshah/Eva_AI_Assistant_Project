@@ -60,6 +60,7 @@ export default async function handler(req,res){
             body:JSON.stringify({
               systemInstruction:{parts:[{text:instructions}]},
               contents:input,
+              tools:[{google_search:{}}],
               generationConfig:{maxOutputTokens:1200,temperature:0.8}
             })
           });
