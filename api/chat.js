@@ -76,7 +76,9 @@ export default async function handler(req,res){
       }
     }
 
-    // OpenAI is intentionally not used here. Eva chat must stay on Gemini.\n\n    return res.status(502).json({error:"Eva Gemini AI is unavailable right now. Please check the Gemini API key/quota in Vercel. Details: "+(lastError||"unknown Gemini error")});
+    // OpenAI is intentionally not used here. Eva chat must stay on Gemini.
+
+    return res.status(502).json({error:"Eva Gemini AI is unavailable right now. Please check the Gemini API key/quota in Vercel. Details: "+(lastError||"unknown Gemini error")});
   }catch(e){
     return res.status(500).json({error:e.message||"Server error"});
   }
