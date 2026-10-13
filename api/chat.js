@@ -47,34 +47,40 @@ export default async function handler(req,res){
 
     let lastError="";
     const requestedModel=String(process.env.GEMINI_CHAT_MODEL||"").trim();
-    const models=["gemini-3.8-flash","gemini-3.5-flash-lite",requestedModel]
+    const models=["gemini-2.5-flash-lite","gemini-3.5-flash-lite","gemini-3.8-flash",requestedModel]
       .filter(Boolean).filter((m,i,a)=>a.indexOf(m)===i);
 
     for(const model of models){
-      try{
-        const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
-          method:"POST",
-          headers:{"Content-Type":"application/json","x-goog-api-key":key},
-          body:JSON.stringify({
+      for(const useSearch of [true,false]){
+        try{
+          const body={
             systemInstruction:{parts:[{text:instructions}]},
             contents:input,
-            tools:[{google_search:{}}],
             generationConfig:{maxOutputTokens:1200,temperature:0.8}
-          })
-        });
-        const data=await response.json().catch(()=>({}));
-        if(response.ok){
-          const reply=data?.candidates?.[0]?.content?.parts?.map(p=>p?.text||"").join("").trim();
-          if(reply)return res.status(200).json({reply});
-          lastError="Gemini returned no text response";
-        }else{
-          lastError=data?.error?.message||("Gemini request failed ("+response.status+")");
-          console.error("Eva Gemini request failed",JSON.stringify({model,status:response.status,error:lastError.slice(0,500)}));
+          };
+          if(useSearch)body.tools=[{google_search:{}}];
+
+          const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
+            method:"POST",
+            headers:{"Content-Type":"application/json","x-goog-api-key":key},
+            body:JSON.stringify(body)
+          });
+          const data=await response.json().catch(()=>({}));
+          if(response.ok){
+            const reply=data?.candidates?.[0]?.content?.parts?.map(p=>p?.text||"").join("").trim();
+            if(reply)return res.status(200).json({reply});
+            lastError="Gemini returned no text response";
+          }else{
+            lastError=data?.error?.message||("Gemini request failed ("+response.status+")");
+            console.error("Eva Gemini request failed",JSON.stringify({model,googleSearch:useSearch,status:response.status,error:lastError.slice(0,500)}));
+            if(response.status===401||response.status===403||response.status===404)break;
+          }
+          // Retry without Google Search grounding if the model/tool combination or quota fails.
+          if(!useSearch&&response.status>=200&&response.status<300)break;
+        }catch(e){
+          lastError=e?.message||"Gemini request failed";
+          console.error("Eva Gemini network error",JSON.stringify({model,googleSearch:useSearch,error:lastError.slice(0,500)}));
         }
-        if(response.status===401||response.status===404||response.status===400||response.status===403||response.status===429)continue;
-      }catch(e){
-        lastError=e?.message||"Gemini request failed";
-        console.error("Eva Gemini network error",JSON.stringify({model,error:lastError.slice(0,500)}));
       }
     }
 
