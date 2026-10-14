@@ -1,11 +1,12 @@
-import {isOwner,isUser} from "./_auth.js";
+import {getAuth} from "./_auth.js";
 
 export default async function handler(req,res){
   if(req.method!=="POST")return res.status(405).json({error:"Method not allowed"});
   try{
     const {messages=[]}=req.body||{};
-    const owner=isOwner(req);
-    const loggedIn=owner||isUser(req);
+    const auth=await getAuth(req);
+    const owner=auth.owner;
+    const loggedIn=auth.loggedIn;
     const key=process.env.GEMINI_API_KEY;
 
     if(!loggedIn)return res.status(401).json({error:"Login required"});
