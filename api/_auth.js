@@ -1,46 +1,20 @@
-import crypto from "crypto";
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://iolkpnunresgnrwqgssd.supabase.co";
+const SUPABASE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || "";
 
-function secret(){
-  const s=process.env.EVA_SESSION_SECRET;
-  return s&&s.length>=32?s:null;
-}
-
-export function sessionToken(){
-  const s=secret();
-  if(!s)return null;
-  return crypto.createHmac("sha256",s).update("owner").digest("hex");
-}
-
-export function userToken(name){
-  const s=secret();
-  if(!s||typeof name!=="string"||name.length<2)return null;
-  return crypto.createHmac("sha256",s).update("user:"+name).digest("hex");
-}
-
-function cookie(req,name){
-  const m=(req.headers.cookie||"").match(new RegExp("(?:^|;\\s*)"+name+"=([^;]+)"));
-  return m?m[1]:null;
-}
-
-export function isOwner(req){
-  const expected=sessionToken(),provided=cookie(req,"eva_owner");
-  if(!expected||!provided)return false;
-  const a=Buffer.from(provided),b=Buffer.from(expected);
-  return a.length===b.length&&crypto.timingSafeEqual(a,b);
-}
-
-export function isUser(req){
-  const raw=cookie(req,"eva_user");
-  if(!raw)return false;
-  try{
-    const dot=raw.lastIndexOf(".");
-    if(dot<1)return false;
-    const encodedName=raw.slice(0,dot),provided=raw.slice(dot+1);
-    const name=decodeURIComponent(encodedName);
-    if(name==="null"||name.length<2)return false;
-    const expected=userToken(name);
-    if(!expected)return false;
-    const a=Buffer.from(provided),b=Buffer.from(expected);
-    return a.length===b.length&&crypto.timingSafeEqual(a,b);
-  }catch{return false}
+export async function getAuth(req) {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  if (!token || !SUPABASE_KEY) return { loggedIn: false, owner: false, user: null };
+  try {
+    const response = await fetch(SUPABASE_URL + "/auth/v1/user", {
+      headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + token }
+    });
+    if (!response.ok) return { loggedIn: false, owner: false, user: null };
+    const user = await response.json();
+    if (!user?.id || !user?.email) return { loggedIn: false, owner: false, user: null };
+    const ownerEmail = String(process.env.EVA_OWNER_EMAIL || "mdalam67860@gmail.com").trim().toLowerCase();
+    return { loggedIn: true, owner: user.email.toLowerCase() === ownerEmail, user };
+  } catch {
+    return { loggedIn: false, owner: false, user: null };
+  }
 }
