@@ -1,7 +1,6 @@
 const $=s=>document.querySelector(s),chat=$("#chat"),input=$("#input"),status=$("#status");
 let identity="guest",displayName="",history=[];
-const ownerAccessRequested=new URLSearchParams(location.search).get("owner")==="1";
-if(ownerAccessRequested){$("#ownerLoginGate").hidden=false;$("#ownerLogin").hidden=false;}
+$("#ownerLoginGate").hidden=false;
 function key(){return "eva_history_"+identity}
 function save(){localStorage.setItem(key(),JSON.stringify(history.slice(-60)))}
 function add(role,text,scroll=true){$("#welcome")?.remove();const row=document.createElement("div");row.className="msg "+role;const av=document.createElement("div");av.className="avatar";av.textContent=role==="user"?"You":"E";const b=document.createElement("div");b.className="bubble";b.textContent=text;role==="user"?row.append(b,av):row.append(av,b);chat.append(row);if(scroll)chat.scrollTop=chat.scrollHeight;return b}
