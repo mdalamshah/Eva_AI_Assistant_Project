@@ -24,7 +24,7 @@ jobs:
           gradle-version: "8.7"
       - name: Validate Eva deployment URL
         env:
-          EVA_URL: ${{ inputs.eva_url }}
+          EVA_URL: ${{ inputs.eva_url || 'https://evaaiassistantproject.vercel.app/' }}
         run: |
           set -euo pipefail
           test -n "$EVA_URL"
@@ -43,7 +43,9 @@ jobs:
             exit 1
           fi
       - name: Build debug APK
-        run: gradle :app:assembleDebug -PevaUrl="${{ inputs.eva_url }}" --no-daemon
+        env:
+          EVA_URL: ${{ inputs.eva_url || 'https://evaaiassistantproject.vercel.app/' }}
+        run: gradle :app:assembleDebug -PevaUrl="$EVA_URL" --no-daemon
         working-directory: android
       - name: Validate APK output
         run: |
