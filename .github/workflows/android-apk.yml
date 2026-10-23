@@ -22,10 +22,45 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.7"
+      - name: Validate Eva deployment URL
+        env:
+          EVA_URL: ${{ inputs.eva_url }}
+        run: |
+          set -euo pipefail
+          test -n "$EVA_URL"
+          case "$EVA_URL" in
+            https://*) ;;
+            *) echo "EVA_URL must start with https://"; exit 1 ;;
+          esac
+          CODE="$(curl -L -sS -o /tmp/eva-home.html -w '%{http_code}' --max-time 30 "$EVA_URL")"
+          echo "Eva URL HTTP status: $CODE"
+          if [ "$CODE" -lt 200 ] || [ "$CODE" -ge 400 ]; then
+            echo "Eva URL is not publicly reachable. Fix the URL before creating an APK."
+            exit 1
+          fi
+          if grep -Eqi 'deployment not found|deployment protection|authentication required|access denied' /tmp/eva-home.html; then
+            echo "Eva URL appears to show a deployment/protection error page."
+            exit 1
+          fi
       - name: Build debug APK
         run: gradle :app:assembleDebug -PevaUrl="${{ inputs.eva_url }}" --no-daemon
         working-directory: android
+      - name: Validate APK output
+        run: |
+          set -euo pipefail
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
+          SIZE="$(stat -c%s "$APK")"
+          echo "APK size: $SIZE bytes"
+          if [ "$SIZE" -lt 8000 ]; then
+            echo "APK is suspiciously small; refusing to upload it as a successful build."
+            exit 1
+          fi
+          unzip -t "$APK"
+          unzip -l "$APK" | grep -q 'classes.dex'
+          unzip -l "$APK" | grep -q 'AndroidManifest.xml'
       - uses: actions/upload-artifact@v4
         with:
           name: Eva-AI-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
