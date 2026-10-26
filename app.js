@@ -48,32 +48,60 @@ function openReminders(){chat.style.display="none";$("#imageStudio").hidden=true
 $("#imageMode").onclick=openStudio;
 $("#reminderMode").onclick=()=>{if(identity==="guest")return showGate(true);openReminders()};
 $("#reminderQuick").onclick=()=>{if(identity==="guest")return showGate(true);openReminders()};
-$("#voiceMode").onclick=()=>{if(identity==="guest")return showGate(true);$("#imageStudio").hidden=true;chat.style.display="block";$("#form").style.display="block";speechEnabled=true;$("#voice").textContent="🔊";voice(true)};
+$("#voiceMode").onclick=()=>{if(identity==="guest")return showGate(true);$("#imageStudio").hidden=true;chat.style.display="block";$("#form").style.display="block";speechEnabled=true;unlockEvaAudio();$("#voice").textContent="🔊";voice(true)};
 $("#generateImage").onclick=async()=>{const p=$("#imagePrompt").value.trim(),err=$("#imageError"),btn=$("#generateImage");err.textContent="";if(!p)return err.textContent="Prompt likhiye.";btn.disabled=true;btn.textContent="⏳ Generating…";status.textContent="Nano Banana is creating…";try{const r=await fetch("/api/image",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({prompt:p,aspectRatio:$("#aspectRatio").value})}),d=await r.json();if(!r.ok)throw Error(d.error||"Image generation failed");const card=document.createElement("div");card.className="image-card";const img=document.createElement("img");img.src=d.image;img.alt=p;const tools=document.createElement("div");tools.className="image-tools";const dl=document.createElement("a");dl.href=d.image;dl.download="eva-image.png";dl.textContent="⬇ Download";tools.append(dl);const cap=document.createElement("span");cap.textContent=(d.remaining??0)+" left";tools.append(cap);card.append(img,tools);$("#gallery").prepend(card);$("#imagePrompt").value="";$("#imageCounter").textContent=(d.remaining??0)+" remaining";status.textContent="Eva is ready"}catch(e){err.textContent=e.message;status.textContent="Image unavailable"}finally{btn.disabled=false;btn.textContent="✨ Generate Image"}};
 $("#form").addEventListener("submit",e=>{e.preventDefault();send(input.value)});input.addEventListener("input",()=>{input.style.height="auto";input.style.height=Math.min(input.scrollHeight,130)+"px"});input.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();$("#form").requestSubmit()}});document.querySelectorAll("[data-q]").forEach(x=>x.onclick=()=>send(x.dataset.q));
 $("#userLogin").onclick=loginUser;$("#ownerLoginGate").onclick=loginOwner;$("#ownerLogin").onclick=async()=>{if(identity==="owner"){await fetch("/api/auth",{method:"DELETE",credentials:"same-origin"});location.reload();return}loginOwner()};
 $("#new").onclick=()=>{history=[];save();location.reload()};$("#clear").onclick=()=>{history=[];save();location.reload()};
 let speechEnabled=false;
 let evaAudio=null;
+let evaAudioUrl=null;
 let evaVoiceBusy=false;
+function unlockEvaAudio(){
+  // Resume browser audio output directly inside the user's tap before async TTS starts.
+  try{
+    const C=window.AudioContext||window.webkitAudioContext;
+    if(C){
+      const ctx=new C();
+      ctx.resume().then(()=>{
+        const osc=ctx.createOscillator(),gain=ctx.createGain();
+        gain.gain.value=0;
+        osc.connect(gain);gain.connect(ctx.destination);
+        osc.start();osc.stop(ctx.currentTime+0.025);
+        setTimeout(()=>ctx.close().catch(()=>{}),120);
+      }).catch(()=>{});
+    }
+    if(!evaAudio){evaAudio=new Audio();evaAudio.preload="auto";evaAudio.playsInline=true;}
+  }catch(e){console.warn("Eva audio unlock failed",e)}
+}
 async function speak(text){
   if(!speechEnabled||!text||evaVoiceBusy)return;
   evaVoiceBusy=true;
+  status.textContent="Eva is preparing her voice…";
   try{
-    if(evaAudio){evaAudio.pause();evaAudio=null}
-    if("speechSynthesis"in window)speechSynthesis.cancel();
+    if(!evaAudio)evaAudio=new Audio();
+    evaAudio.pause();
+    if(evaAudioUrl){URL.revokeObjectURL(evaAudioUrl);evaAudioUrl=null;}
     const clean=String(text).replace(/[*#_`>]/g,"").replace(/https?:\/\/\S+/g,"link").trim();
     const r=await fetch("/api/voice",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({text:clean})});
-    if(!r.ok){let d={};try{d=await r.json()}catch{};throw Error(d.error||"Eva ki selected voice abhi available nahi hai.");}
+    if(!r.ok){
+      let d={};try{d=await r.json()}catch{}
+      throw Error(d.error||("Voice API failed (HTTP "+r.status+")."));
+    }
     const blob=await r.blob();
-    evaAudio=new Audio(URL.createObjectURL(blob));
-    evaAudio.onended=()=>{evaVoiceBusy=false};
-    evaAudio.onerror=()=>{evaVoiceBusy=false;status.textContent="Eva voice audio play nahi ho saka."};
+    if(!blob.size)throw Error("Voice API returned an empty audio file.");
+    evaAudioUrl=URL.createObjectURL(blob);
+    evaAudio.src=evaAudioUrl;
+    evaAudio.volume=1;
+    evaAudio.muted=false;
+    evaAudio.onended=()=>{evaVoiceBusy=false;status.textContent="Eva is ready";if(evaAudioUrl){URL.revokeObjectURL(evaAudioUrl);evaAudioUrl=null;}};
+    evaAudio.onerror=()=>{evaVoiceBusy=false;status.textContent="Eva audio playback failed. Tap Voice Mode again and check browser audio permissions.";};
     await evaAudio.play();
+    status.textContent="Eva is speaking…";
   }catch(e){
     evaVoiceBusy=false;
-    status.textContent="Eva ki selected voice unavailable hai. Robot voice use nahi ki gayi.";
-    console.warn("Selected Eva voice unavailable:",e);
+    status.textContent="Eva voice error: "+(e?.message||"Audio could not be played. Tap Voice Mode again.");
+    console.warn("Eva selected voice failed:",e);
   }
 }
 function voice(autoSend=false){const R=window.SpeechRecognition||window.webkitSpeechRecognition;if(!R){status.textContent="Voice input is not supported in this browser.";alert("Is browser me voice input supported nahi hai. Chrome me microphone permission ke saath try karein.");return}const r=new R();r.lang="hi-IN";r.interimResults=false;r.maxAlternatives=1;r.onstart=()=>status.textContent="Listening…";r.onresult=e=>{const transcript=(e.results?.[0]?.[0]?.transcript||"").trim();if(!transcript){status.textContent="Awaaz samajh nahi aayi. Dobara try karein.";return}if(autoSend){status.textContent="Eva is thinking…";send(transcript)}else{input.value=transcript;input.dispatchEvent(new Event("input"));status.textContent="Speech converted to text. Send when ready."}};r.onerror=e=>{status.textContent=e.error==="not-allowed"?"Microphone permission denied":"Voice unavailable. Try again.";};r.onend=()=>{if(status.textContent==="Listening…")status.textContent="Eva is ready"};try{r.start()}catch(e){status.textContent="Voice could not start. Try again."}}
@@ -95,4 +123,4 @@ $("#settingsButton")?.addEventListener("click",()=>openEvaSettings(true));
 $("#settingsClose")?.addEventListener("click",()=>openEvaSettings(false));
 $("#settingsShade")?.addEventListener("click",()=>openEvaSettings(false));
 $("#voiceToggle")?.addEventListener("change",e=>{speechEnabled=e.target.checked;$("#voice").textContent=speechEnabled?"🔊":"🎙";if(!speechEnabled){if(evaAudio){evaAudio.pause();evaAudio=null}if("speechSynthesis"in window)speechSynthesis.cancel()}});
-$("#settingsTestVoice")?.addEventListener("click",()=>{if(!speechEnabled){speechEnabled=true;$("#voiceToggle").checked=true;$("#voice").textContent="🔊"}speak("नमस्ते! मैं ईवा हूँ। अब मैं हमेशा अपनी चुनी हुई आवाज़ में आपसे बात करने की कोशिश करूँगी।")});
+$("#settingsTestVoice")?.addEventListener("click",()=>{unlockEvaAudio();if(!speechEnabled){speechEnabled=true;$("#voiceToggle").checked=true;$("#voice").textContent="🔊"}speak("नमस्ते! मैं ईवा हूँ। अब मैं हमेशा अपनी चुनी हुई आवाज़ में आपसे बात करने की कोशिश करूँगी।")});
